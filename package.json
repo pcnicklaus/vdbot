@@ -1,0 +1,23 @@
+{
+  "name": "vd-bot",
+  "version": "1.0.0",
+  "main": "vdbot.js",
+  "dependencies": {
+    "axios": "^0.16.2",
+    "babel-core": "^6.24.0",
+    "botkit": "^0.5.4",
+    "dotenv": "^2.0.0",
+    "lodash": "^4.17.4"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.24.0",
+    "babel-preset-es2015": "^6.24.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node bot_one.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}
