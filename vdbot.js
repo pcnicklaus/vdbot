@@ -37,6 +37,15 @@ function processResponses(data) {
   return responses;
 }
 
+function processIntoMessage(object) {
+  let string = '';
+  Object.entries(object).forEach(([ key, value]) => {
+    if( typeof value === 'string' ) {
+      string += `${key}: ${value} \n`;
+    }
+  })
+  return string;
+}
 /////////////////////////////
 // all state & federal reps
 // google
@@ -103,9 +112,8 @@ function askSpecificBill(response, convo, bills) {
         console.log('\n bill in filter \n', bill)
         return bill.bill_slug === response.text
       })
-      Object.entries(selected[0]).forEach(([ key, value ]) => {
-        convo.say(`${key}:  ${value}`);
-      })
+      const message = processIntoMessage(selected[0]);
+      convo.say(message)
     }
     askSpecificBill(response, convo, bills)
   })
@@ -138,34 +146,57 @@ controller.hears(['search bills', 'any bills about'], 'direct_message,direct_men
 // GET https://api.propublica.org/congress/v1/members/{member-id}.json
 
 
-function askRepInfo(response, convo, reps, senateOrHouse) {
+
+// https://api.propublica.org/congress/v1/members/C001084/statements.json
+
+function askStatements(response, convo, repDetail) {
+  convo.ask(`Would you like any of ${repDetail.first_name} ${repDetail.last_name} congressional statements? If not, gimme a no.`, async (response, convo) => {
+
+    if (response.text.trim() === 'no') {
+      convo.next();
+    }
+    const raw = await get(`${propublicaBaseURL}members/${rep.id}/statements.json`);
+    const rawStatements = raw.data.results
+
+    console.log('rawST', rawStatements)
+
+    rawStatements.map((statement) => {
+      const statementProcessed = processIntoMessage(statement);
+      convo.say(statementProcessed);
+    })
+
+    askStatements(response, convo, reps);
+
+    convo.next();
+  })
+}
+
+//////////////////////////////
+// propublica get reps detail
+//////////////////////////////
+function askRepInfo(response, convo, reps) {
   convo.ask('Want more info on any of them? If so, type his/her id. If not, gimme a no!!! (yay!)', async (response, convo) => {
 
-    if (response.text === 'no') {
+    if (response.text.trim() === 'no') {
+      askStatements(response, convo, rep)
       convo.next();
     }
     const selectedRep = _.filter(reps, (rep) => {
-      console.log('rep.id.trim() === response.text.trim()', rep.id.trim() === response.text.trim())
       return rep.id.trim() === response.text.trim();
-    })
-    console.log('seleced rp', selectedRep)
-    const repQuery = `${propublicaBaseURL}members/${selectedRep[0].id}.json`;
-    console.log('voting query', repQuery)
-    const repData = get(repQuery);
-    const repDetail = repData.data;
+    });
+    const repData = await get(selectedRep[0].api_uri);
+    const repDetail = repData.data.results[0];
+    const repProcessed = processIntoMessage(repDetail)
 
-    repDetail.map((line) => {
-
-    })
-
-    console.log(repDetail);
-    // console.log(voting.results)
-    // console.log(voting.results[0])
-    // console.log(voting.results[0].votes);
+    convo.say(repProcessed);
+    askRepInfo(response, convo, repDetail)
+    convo.next();
   })
-  convo.next();
 
 }
+// Object.entries(rep).forEach( ([ key, value ]) => {
+//   if (value !== null) { convo.say(`${key}:  ${value}`) }
+// })
 
 // GET https://api.propublica.org/congress/v1/members/{chamber}/{state}/current.json
 controller.hears(['find senate reps', 'find senate reps', 'get senate reps', 'get house reps'], 'direct_message,direct_mention,mention', function(bot, message) {
@@ -178,18 +209,15 @@ controller.hears(['find senate reps', 'find senate reps', 'get senate reps', 'ge
         const senateOrHouse = responses[1].trim();
         const state = responses[0].trim();
         const query = `${ propublicaBaseURL }members/${senateOrHouse }/${ state }/current.json`;
-        console.log('qyery', query);
         const data = await get(query)
         const reps = data.data.results;
+
         reps.map( rep => {
-          Object.entries(rep).forEach( ([ key, value ]) => {
-            if (value !== null) { convo.say(`${key}:  ${value}`) }
-          })
+          const message = `${rep.name}, ${rep.role}, member id: ${rep.id}`;
+          convo.say(message);
         })
-        // reps.map( (rep) => {
-        //   convo.say(rep);
-        // })
-        askRepInfo(response, convo, reps, senateOrHouse)
+
+        askRepInfo(response, convo, reps)
 
         convo.next();
       })
