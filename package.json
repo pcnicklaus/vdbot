@@ -7,7 +7,9 @@
     "babel-core": "^6.24.0",
     "botkit": "^0.5.4",
     "dotenv": "^2.0.0",
-    "lodash": "^4.17.4"
+    "flat": "^4.0.0",
+    "lodash": "^4.17.4",
+    "nodemon": "^1.11.0"
   },
   "devDependencies": {
     "babel-cli": "^6.24.0",
@@ -15,7 +17,7 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node bot_one.js"
+    "start": "nodemon vdbot.js"
   },
   "author": "",
   "license": "ISC",

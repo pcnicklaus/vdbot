@@ -1,3 +1,26 @@
+function askTopOrgContributors(response, convo, reps) {
+  convo.ask('Do you want to get a list of the top organizations contributing to specific rep/politician? If so, enter their id number. If not, gimme a no.', async (response, convo) => {
+    convo.next();
+
+    if (response.text.trim() === 'no') {
+      convo.next();
+    }
+
+    const selected = find(reps, 'id', response.text.trim() )
+
+    console.log('\nselected\n', selected, '\nresponse.text.trim\n', response.text.trim())
+
+    const query = `${OPEN_SECRETS_BASE_URL}=candContrib&cid=${selected[0].crp_id}&cycle=2016&apikey=4047df8b3dceca553a2c5e9b0ff79582&output=json`
+
+    const raw = await get(query)
+    const data = raw.data.response.contributors;
+    const flatData = flatten(data);
+    const message = processIntoMessage(flatData, true)
+    convo.say(message)
+    convo.next()
+  })
+}
+
 
 ////////////////////////////
 // propublica search bills
