@@ -6,6 +6,7 @@ require('babel-core/register')({
 const axios = require('axios');
 const _ = require('lodash');
 const Botkit = require('Botkit');
+const flatten = require('flat')
 // const dotenv = require('dotenv').config();
 
 const controller = Botkit.slackbot({
@@ -17,11 +18,15 @@ const bot = controller.spawn({
 }).startRTM();
 
 
+/////////////////////////
+// variables / constants
+/////////////////////////
+const PROPUBLICA_BASE_URL = 'https://api.propublica.org/congress/v1';
+const OPEN_SECRETS_BASE_URL = 'http://www.opensecrets.org/api/?method';
 
-let propublicaBaseURL = "https://api.propublica.org/congress/v1/";
-///////////////////
-// shared
-/////////////////
+/////////////////////
+// helper functions
+////////////////////
 async function get(queryString) {
   const response = await axios({
       method: 'get',
@@ -36,15 +41,25 @@ function processResponses(data) {
   })
   return responses;
 }
-
-function processIntoMessage(object) {
+// holy hacky fuck. well it's not so much hacky as lazy. FIX THIS you slack ass punk!!!
+function processIntoMessage(object, regex) {
   let string = '';
   Object.entries(object).forEach(([ key, value]) => {
-    if( typeof value === 'string' ) {
+    if( typeof value === 'string' || 'number') {
+
+      if (regex === true) {
+        key = key.replace(/contribu.*attributes/, '').replace(/@attributes/, '').replace(/./, '').replace(/org_name: /, '');
+      }
       string += `${key}: ${value} \n`;
     }
   })
   return string;
+}
+function find(array, property, text) {
+  const found = array.filter((item) => {
+    return item[property].toLowerCase() === text.toLowerCase();
+  })
+  return found;
 }
 /////////////////////////////
 // all state & federal reps
@@ -90,9 +105,9 @@ function buildQuery(responses) {
   let url;
 
   if (responses[1].trim().toLowerCase() === 'phrase') {
-    url = propublicaBaseURL + 'bills/search.json?query=' + "'" + responses[0].trim().replace(' ', '+') + "'"
+    url = PROPUBLICA_BASE_URL + 'bills/search.json?query=' + "'" + responses[0].trim().replace(' ', '+') + "'"
   } else {
-    url = `${propublicaBaseURL}bills/search.json?query=${responses[0].trim().replace(' ', '+')}`
+    url = `${PROPUBLICA_BASE_URL}bills/search.json?query=${responses[0].trim().replace(' ', '+')}`
   }
   if (responses[2].trim().toLowerCase() === 'relevance') {
     url = `${url}&sort=_score`
@@ -145,18 +160,124 @@ controller.hears(['search bills', 'any bills about'], 'direct_message,direct_men
 });
 // GET https://api.propublica.org/congress/v1/members/{member-id}.json
 
-
-
-// https://api.propublica.org/congress/v1/members/C001084/statements.json
-
-function askStatements(response, convo, repDetail) {
-  convo.ask(`Would you like any of ${repDetail.first_name} ${repDetail.last_name} congressional statements? If not, gimme a no.`, async (response, convo) => {
+///////////////////////////////////////////////////////////////////////////////
+// Open Secrets
+// http://www.opensecrets.org/api/?method=candContrib&cid=N00009888&cycle=2016&apikey=----&output=json
+//4047df8b3dceca553a2c5e9b0ff79582
+// ******* NOTE - cycle i.e. year is hardcoded - 2016
+////////////////////////////////////////////////////////////////////////////////
+// http://www.opensecrets.org/api/?method=candSummary&cid=N00007360&cycle=2012&apikey=__apikey__
+function askOpenSecretsPFD(response, convo, reps) {
+  convo.ask('Do you wanna a see a reps personal financial disclosure? If yes, id me (well the rep. you know the drill by now! or i hope you do...)! If not, gimme a no.', async (response, convo) => {
+    convo.next();
 
     if (response.text.trim() === 'no') {
       convo.next();
     }
-    const raw = await get(`${propublicaBaseURL}members/${rep.id}/statements.json`);
+
+    const selected = find(reps, 'id', response.text.trim() )
+
+    console.log('\nselected\n', selected, '\nresponse.text.trim\n', response.text.trim())
+
+    const query = `${OPEN_SECRETS_BASE_URL}=memPFDprofile&year=2014cid=${selected[0].crp_id}&apikey=4047df8b3dceca553a2c5e9b0ff79582&output=json`
+    const raw = await get(query)
+    const data = raw.data.response.member_profile;
+    console.log('\ndata\n',data)
+    const member = data['@attributes'];
+    console.log('\nmember\n', member)
+    const flatMember = await flatten(member);
+
+    convo.say(processIntoMessage(flatMember, false))
+
+    data.assets.asset.map((asset) => {
+      Object.entries(asset).forEach(([ key, value ]) => {
+        console.log('\n value \n', value)
+        const flatAsset = processIntoMessage(value)
+        console.log('\n flat asset \n', flatAsset)
+        convo.say(flatAsset);
+      })
+    })
+
+    askOpenSecretsPFD(response, convo, reps);
+    convo.next()
+  })
+}
+
+
+function askOpenSecretsSummary(response, convo, reps) {
+  convo.ask('Do you want the open secrets summary on a specific rep/politician? If so, enter their id number. If not, gimme a no.', async (response, convo) => {
+    convo.next();
+
+    if (response.text.trim() === 'no') {
+      askOpenSecretsPFD(response, convo, reps);
+      convo.next();
+    }
+
+    const selected = find(reps, 'id', response.text.trim() )
+
+    console.log('\nselected\n', selected, '\nresponse.text.trim\n', response.text.trim())
+
+    const query = `${OPEN_SECRETS_BASE_URL}=candSummary&cid=${selected[0].crp_id}&cycle=2016&apikey=4047df8b3dceca553a2c5e9b0ff79582&output=json`
+    const raw = await get(query)
+    const data = raw.data.response.summary["@attributes"];
+    const flatData = await flatten(data);
+    const message = await processIntoMessage(flatData, false);
+    convo.say(message);
+
+    askOpenSecretsSummary(response, convo, reps);
+    convo.next()
+  })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Open Secrets - top 10 contributors
+// http://www.opensecrets.org/api/?method=candContrib&cid=N00009888&apikey=4047df8b3dceca553a2c5e9b0ff79582&output=json
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+function askTopOrgContributors(response, convo, reps) {
+  convo.ask('Do you want to get a list of the top organizations contributing to specific rep/politician? If so, enter their id number. If not, gimme a no.', async (response, convo) => {
+    convo.next();
+
+    if (response.text.trim() === 'no') {
+      askOpenSecretsSummary(response, convo, reps);
+      convo.next();
+    }
+
+    const selected = find(reps, 'id', response.text.trim() )
+
+    console.log('\nselected\n', selected, '\nresponse.text.trim\n', response.text.trim())
+
+    const query = `${OPEN_SECRETS_BASE_URL}=candContrib&cid=${selected[0].crp_id}&cycle=2016&apikey=4047df8b3dceca553a2c5e9b0ff79582&output=json`
+
+    const raw = await get(query)
+    const data = raw.data.response.contributors;
+    console.log('\n data \n', data)
+    const flatData = flatten(data);
+    console.log('\n flatData \n', flatData)
+    const message = processIntoMessage(flatData, true)
+    console.log('\n message \n', message)
+    convo.say(message)
+    convo.next()
+
+    askTopOrgContributors(response, convo, reps)
+    convo.next()
+  })
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// propublica rep stmts
+// https://api.propublica.org/congress/v1/members/C001084/statements.json
+////////////////////////////////////////////////////////////////////////////////
+function askStatements(response, convo, reps) {
+  convo.ask(`Wanna see their last 20 congressional statements? If so, enter their id. If not, gimme a no.`, async (response, convo) => {
+
+    if (response.text.trim() === 'no') {
+      askTopOrgContributors(response, convo, reps);
+      convo.next();
+    }
+    const raw = await get(`${PROPUBLICA_BASE_URL}/members/${response.text.trim()}/statements.json`);
     const rawStatements = raw.data.results
+    console.log('raw.data', raw.data)
 
     console.log('rawST', rawStatements)
 
@@ -178,7 +299,7 @@ function askRepInfo(response, convo, reps) {
   convo.ask('Want more info on any of them? If so, type his/her id. If not, gimme a no!!! (yay!)', async (response, convo) => {
 
     if (response.text.trim() === 'no') {
-      askStatements(response, convo, rep)
+      askStatements(response, convo, reps)
       convo.next();
     }
     const selectedRep = _.filter(reps, (rep) => {
@@ -189,7 +310,7 @@ function askRepInfo(response, convo, reps) {
     const repProcessed = processIntoMessage(repDetail)
 
     convo.say(repProcessed);
-    askRepInfo(response, convo, repDetail)
+    askRepInfo(response, convo, reps)
     convo.next();
   })
 
@@ -208,24 +329,36 @@ controller.hears(['find senate reps', 'find senate reps', 'get senate reps', 'ge
         const responses = processResponses(convo.responses)
         const senateOrHouse = responses[1].trim();
         const state = responses[0].trim();
-        const query = `${ propublicaBaseURL }members/${senateOrHouse }/${ state }/current.json`;
+        const query = `${ PROPUBLICA_BASE_URL }/115/${senateOrHouse }/members.json`;
         const data = await get(query)
-        const reps = data.data.results;
+        const reps = data.data.results[0].members;
+        localStorage.setItem('reps-string', JSON.stringify(reps))
+        const stateReps = find(reps, 'state', state)
 
-        reps.map( rep => {
-          const message = `${rep.name}, ${rep.role}, member id: ${rep.id}`;
+        stateReps.map( rep => {
+          const message = `${rep.first_name}, ${rep.last_name}, member id: ${rep.id}`;
+          console.log('message\n', message)
           convo.say(message);
         })
 
         askRepInfo(response, convo, reps)
-
         convo.next();
       })
     })
   }
   bot.startConversation(message, getReps);
 })
-
+// GET https://api.propublica.org/congress/v1/members/{chamber}/{state}/current.json
+controller.hears(['find rep data', 'find rep detail'], 'direct_message,direct_mention,mention', function(bot, message) {
+  const getRepDetail = (response, convo) => {
+    convo.ask('Whats the id of the rep you want more info on?', async (response, convo) => {
+      console.log("\n local storage \n", localStorage.getItem('reps'))
+      const reps = JSON.parse(localStorage.getItem('reps'))
+      console.log('\n reps \n',reps)
+    })
+  }
+  bot.startConversation(message, getRepDetail);
+})
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //        TO DO
 // 1 Get Congressional Statements by Search Term
