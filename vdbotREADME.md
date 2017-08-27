@@ -1,9 +1,5 @@
 To Do
 - pagination
-
-
-refactorin' taaaaa doo
-- propublica - GET function
-    - takes in url and returns the response
-- build query string  
-  - starts with base url and then builds off that.
+- ummm. other stuff for sure...
+- like lots of other stuffs.
+- more other stuffs for sure.
