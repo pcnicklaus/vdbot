@@ -67,7 +67,7 @@ module.exports = {
     if (responses[1].trim().toLowerCase() === 'phrase') {
       url = baseURL + '/bills/search.json?query=' + "'" + responses[0].trim().replace(' ', '+') + "'"
     } else {
-      url = `${baseURL}bills/search.json?query=${responses[0].trim().replace(' ', '+')}`
+      url = `${baseURL}/bills/search.json?query=${responses[0].trim().replace(' ', '+')}`
     }
     if (responses[2].trim().toLowerCase() === 'relevance') {
       url = `${url}&sort=_score`
