@@ -1,3 +1,5 @@
+require('dotenv').config()
+
 const _ = require('lodash');
 const axios = require('axios');
 require('babel-core/register')({ "presets": ["es2015"] });
@@ -10,7 +12,7 @@ module.exports = {
     const response = await axios({
         method: 'get',
         url: queryString,
-        headers: { 'X-API-Key' : 'MMG3WpX26u1S6TZpKzUhY44tGeIkDmGS1RBhoSWU' }
+        headers: { 'X-API-Key' : process.env.PROPUBLICA_KEY }
     })
     console.log('\nrespons\n', response);
     console.log('\n errors \n', response.errors)

@@ -1,1 +1,1 @@
-Procfile
+worker: nodemon vdbot.js

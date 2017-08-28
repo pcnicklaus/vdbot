@@ -1,4 +1,5 @@
 "use strict";
+require('dotenv').config()
 
 require('babel-core/register')({
         "presets": ["es2015"]
@@ -15,7 +16,7 @@ const controller = Botkit.slackbot({
 });
 
 const bot = controller.spawn({
-    token: "xoxb-228962851811-00tjz44DoWs2YepqZbpX7asl",
+    token: process.env.SLACK_TOKEN,
 }).startRTM();
 
 
@@ -96,7 +97,7 @@ controller.hears(['all reps', 'my workforce',], 'direct_message,direct_mention,m
     convo.ask('What\'s your address?', async (response, convo ) => {
       let string = ''
 
-      const repData = await axios.get(`https://www.googleapis.com/civicinfo/v2/representatives?key=AIzaSyCGH0hm61rqilP4-cdWrBQGkEHJEwGdBqs&address=${convo.transcript[1].text}`)
+      const repData = await axios.get(`https://www.googleapis.com/civicinfo/v2/representatives?key=${ process.env.GOOGLE_TOKEN }&address=${convo.transcript[1].text}`)
       const processedReps = await processRepData(repData)
       const verbiage = _.map(processedReps, (entry, key) => {
 
@@ -204,7 +205,7 @@ controller.hears(['pfd', 'personal financial disclosure'],'direct_message,direct
 
         console.log('\nselected\n', selected)
 
-        const query = `${OPEN_SECRETS_BASE_URL}=memPFDprofile&year=2014&cid=${selected[0].crp_id}&apikey=4047df8b3dceca553a2c5e9b0ff79582&output=json`
+        const query = `${OPEN_SECRETS_BASE_URL}=memPFDprofile&year=2014&cid=${selected[0].crp_id}&apikey=${process.env.OPEN_SECRETS_KEY}&output=json`
         console.log('\n query: >>>', query);
 
         const raw = await helpers.get(query)
@@ -248,7 +249,7 @@ controller.hears(['open secrets summary', 'rep summary'], 'direct_message,direct
         selected = await helpers.find(REPS.house, 'id', response.text.trim())
       }
 
-      const query = `${OPEN_SECRETS_BASE_URL}=candSummary&cid=${selected[0].crp_id}&cycle=2016&apikey=4047df8b3dceca553a2c5e9b0ff79582&output=json`;
+      const query = `${OPEN_SECRETS_BASE_URL}=candSummary&cid=${selected[0].crp_id}&cycle=2016&apikey=${ process.env.OPEN_SECRETS_KEY }&output=json`;
       console.log('\n query: >>>', query);
 
       const raw = await helpers.get(query)
@@ -289,7 +290,7 @@ controller.hears(['top donors', 'who bankrolls'], 'direct_message,direct_mention
       }
 
 
-      const query = `${OPEN_SECRETS_BASE_URL}=candContrib&cid=${selected[0].crp_id}&cycle=2016&apikey=4047df8b3dceca553a2c5e9b0ff79582&output=json`;
+      const query = `${OPEN_SECRETS_BASE_URL}=candContrib&cid=${selected[0].crp_id}&cycle=2016&apikey=${ process.env.OPEN_SECRETS_KEY }&output=json`;
       console.log('\n query: >>>', query);
 
       const raw = await helpers.get(query)
