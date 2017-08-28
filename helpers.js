@@ -1,4 +1,4 @@
-require('dotenv').config()
+// require('dotenv').config()
 
 const _ = require('lodash');
 const axios = require('axios');
