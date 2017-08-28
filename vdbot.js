@@ -6,7 +6,7 @@ require('babel-core/register')({
 });
 const axios = require('axios');
 const _ = require('lodash');
-const Botkit = require('Botkit');
+const Botkit = require('botkit');
 const flatten = require('flat')
 // const dotenv = require('dotenv').config();
 const helpers = require('./helpers');
