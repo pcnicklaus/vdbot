@@ -1,4 +1,4 @@
-// require('dotenv').config()
+require('dotenv').config()
 
 const _ = require('lodash');
 const axios = require('axios');
@@ -13,10 +13,8 @@ module.exports = {
     const response = await axios({
         method: 'get',
         url: queryString,
-        headers: { 'X-API-Key' : process.env.PROPUBLICA_KEY || "MMG3WpX26u1S6TZpKzUhY44tGeIkDmGS1RBhoSWU" }
+        headers: { 'X-API-Key' : process.env.PROPUBLICA_KEY }
     })
-    // console.log('\nrespons\n', response);
-    // console.log('\n errors \n', response.errors)
 
     return response;
   },
@@ -57,11 +55,17 @@ module.exports = {
     })
     return;
   },
-  sayArray: async function (array, convo) {
-    await array.map( async (rawMessage) => {
-      const message = await helpers.processIntoMessage(rawMessage);
-      await convo.say(message);
-    })
+  sayArray: async function (incomingArray, convo) {
+    incomingArray.map( async entry => {
+        let string = '\n -------------------------------------------------- \n'
+        await Object.entries(entry).forEach( async ([ key, value]) => {
+          if( typeof value === 'string' || 'number') {
+            console.log('key', key, "\n value", value);
+            string += `${key}: ${value} \n`;
+          }
+        })
+        await convo.say(string.concat('\n'));
+      })
   },
   buildSearchBillsQuery: function (responses, baseURL) {
     // https://api.propublica.org/congress/v1/bills/search.json?query='green technology'&sort=_score
@@ -77,5 +81,16 @@ module.exports = {
     }
     console.log('\nurl\n', url);
     return url;
+  },
+  processGoogleRepData: function(data) {
+    let cleanedData = {};
+
+    _.map(data.data.offices, (entry) => {
+       	let totalOffs = entry.officialIndices.length;
+        for (let i = 0; i < totalOffs; i++) {
+       	 	return cleanedData[entry.name] = data.data.officials[entry.officialIndices[totalOffs - 1]];
+      	}
+      });
+    return cleanedData;
   }
 }
