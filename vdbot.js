@@ -7,38 +7,54 @@ require('babel-core/register')({
 const axios = require('axios');
 const _ = require('lodash');
 const Botkit = require('botkit');
+const mongoose = require('mongoose');
 const flatten = require('flat')
 // const dotenv = require('dotenv').config();
 const helpers = require('./helpers');
+
+const Rep = require('./models/rep');
 
 const controller = Botkit.slackbot({
     debug: false
 });
 
 const bot = controller.spawn({
-    token: process.env.SLACK_TOKEN,
+    token: process.env.SLACK_TOKEN || "xoxb-339811771763-YqCz62xhRWVDNhqwAyZnw1nr",
 }).startRTM();
 
+mongoose.Promise = global.Promise;
+mongoose.connect('mongodb://localhost/vd-bot');
 
 /////////////////////////
 // variables / constants
 /////////////////////////
 const PROPUBLICA_BASE_URL = 'https://api.propublica.org/congress/v1';
 const OPEN_SECRETS_BASE_URL = 'http://www.opensecrets.org/api/?method';
-const REPS = {};
-async function getHouseReps()  {
-  let houseQuery = `${ PROPUBLICA_BASE_URL }/115/house/members.json`;
-  const raw = await helpers.get(houseQuery);
-  REPS.house = raw.data.results[0].members;
-}
-getHouseReps();
-
-async function getSenateReps() {
-  const senateQuery = `${ PROPUBLICA_BASE_URL }/115/senate/members.json`;
-  const raw = await helpers.get(senateQuery);
-  REPS.senate = raw.data.results[0].members;
-}
-getSenateReps();
+// const REPS = {};
+// async function getHouseReps()  {
+//   let houseQuery = `${ PROPUBLICA_BASE_URL }/115/house/members.json`;
+//   const raw = await helpers.get(houseQuery);
+//   REPS.house = raw.data.results[0].members;
+//
+//   Rep.collection.insert(REPS.house, (err, docs) => {
+//     if (err) { console.log('err', err); }
+//     else { console.log('docs, yaya', docs); }
+//   })
+//
+// }
+// getHouseReps();
+//
+// async function getSenateReps() {
+//   const senateQuery = `${ PROPUBLICA_BASE_URL }/115/senate/members.json`;
+//   const raw = await helpers.get(senateQuery);
+//   REPS.senate = raw.data.results[0].members;
+//
+//   Rep.collection.insert(REPS.house, (err, docs) => {
+//     if (err) { console.log('err', err); }
+//     else { console.log('docs, yaya', docs); }
+//   })
+// }
+// getSenateReps();
 
 /////////////////////////////
 // all state & federal reps
@@ -67,7 +83,7 @@ const COMMANDS = [
 
   "Google \n",
   "find all federal and state reps:   *all reps*  or  *my workforce* \n \n",
-
+//
   "open secrets searches \n",
   "rep summary:  *rep summary*  or  *the skinny on*  \n",
   "rep\'s top donors:  *top donors*  or  *who bankrolls* \n",
@@ -97,7 +113,7 @@ controller.hears(['all reps', 'my workforce',], 'direct_message,direct_mention,m
     convo.ask('What\'s your address?', async (response, convo ) => {
       let string = ''
 
-      const repData = await axios.get(`https://www.googleapis.com/civicinfo/v2/representatives?key=${ process.env.GOOGLE_TOKEN }&address=${convo.transcript[1].text}`)
+      const repData = await axios.get(`https://www.googleapis.com/civicinfo/v2/representatives?key=${ process.env.GOOGLE_TOKEN || 'AIzaSyCGH0hm61rqilP4-cdWrBQGkEHJEwGdBqs' }&address=${convo.transcript[1].text}`)
       const processedReps = await processRepData(repData)
       const verbiage = _.map(processedReps, (entry, key) => {
 
@@ -122,6 +138,8 @@ controller.hears(['all reps', 'my workforce',], 'direct_message,direct_mention,m
         })
         string = `${ string } \n`;
       })
+      console.log('\nverbiage\n', verbiage)
+      console.log('\nprocessed reps\n', processedReps)
 
       convo.say(string);
       convo.next();
@@ -186,6 +204,12 @@ controller.hears(['search bills', 'any bills about'], 'direct_message,direct_men
 
 /////////////////////////////////////
 // Open Secrets - PFD
+//
+//
+//
+//        needs REP refactor
+//
+//
 /////////////////////////////////////
 controller.hears(['pfd', 'personal financial disclosure'],'direct_message,direct_mention,mention', function(bot, message) {
 
@@ -233,6 +257,11 @@ controller.hears(['pfd', 'personal financial disclosure'],'direct_message,direct
 
 /////////////////////////////////////
 // Open Secrets - Rep Summary
+//
+//
+//        needs REP refactor
+//
+//
 /////////////////////////////////////
 controller.hears(['open secrets summary', 'rep summary'], 'direct_message,direct_mention,mention', function(bot, message) {
 
@@ -273,6 +302,11 @@ controller.hears(['open secrets summary', 'rep summary'], 'direct_message,direct
 
 /////////////////////////////////////
 // Open Secrets - top 10 contributors
+//
+//
+//        needs REP refactor
+//
+//
 /////////////////////////////////////
 controller.hears(['top donors', 'who bankrolls'], 'direct_message,direct_mention,mention', function(bot, message) {
 
@@ -317,6 +351,11 @@ controller.hears(['top donors', 'who bankrolls'], 'direct_message,direct_mention
 ////////////////////////////////////////////////////////////////////////////////
 // propublica rep stmts
 // https://api.propublica.org/congress/v1/members/C001084/statements.json
+//
+//
+//        needs REP refactor
+//
+//
 ////////////////////////////////////////////////////////////////////////////////
 controller.hears(['rep statements', 'what did they say'], 'direct_message,direct_mention,mention', function(bot, message) {
 
@@ -358,34 +397,58 @@ controller.hears(['rep statements', 'what did they say'], 'direct_message,direct
 controller.hears(['rep info', 'who is'], 'direct_message,direct_mention,mention', function(bot, message) {
 
   const startConvo = async (reponse, convo) => {
-    await convo.ask('Want more info on any of them? If so, type his/her id. If not, gimme a no.', async (response, convo) => {
+    await convo.ask('What is their id? If you don\'t have it, type "national reps" to get your reps and then do another "rep info"', async (response, convo) => {
       convo.next();
 
       if (response.text.trim() === 'no') {
         convo.next();
       }
 
-      const selected = await helpers.find(REPS.senate, 'id', response.text.trim())
-      if (!selected) {
-        selected = await helpers.find(REPS.house, 'id', response.text.trim())
-      }
+      // const selected = await helpers.find(REPS.senate, 'id', response.text.trim())
+      // console.log('huhhhhhhhh', REPS.house.length);
+      // console.log('huhhhhhhhh', REPS.senate[0], REPS.senate[1]);
+      //
+      // console.log('huhhhhhhhh', REPS.house.concat(REPS.senate).length);
 
 
-      const query = `${selected[0].api_uri}`;
-      console.log('\n query: >>>', query);
 
-      const raw = await helpers.get(query)
-      const data = raw.data.results[0];
-      console.log('\n data yay \n \n', data)
+      // const selected = _.filter(REPS.house.concat(REPS.house), (selected) => {
+      //   // console.log('selected', selected.id, '\n response.text.trim \n', response.text.trim())
+      //   return selected.id === response.text.trim;
+      // })
 
-      // const flatData = await flatten(data);
+      // console.log('response.text.trim()', response.text.trim())
+      // console.log('REPS.senate', REPS.senate)
+
+
+      // console.log('selected', selected)
+      // if (!selected) {
+        // selected = await helpers.find(REPS.house, 'id', response.text.trim())
+        // console.log('selected', selected)
+      // }
+      // console.log('selected', selected)
+
+      // const query = `${selected[0].api_uri}`;
+      // console.log('\n query: >>>', query);
+
+      let rep = await Rep.find({"id": response.text.trim().toString() })
+      //   .then( async (rep) => {
+      //
+      // })
+      console.log("selected", rep);
+      //
+      // const raw = await helpers.get(query)
+      // const data = raw.data.results[0];
+      // console.log('\n data yay \n \n', data)
+      //
+      // const flatData = await flatten(rep);
       // console.log('\n flatData boo \n \n', flatData)
-
-      const message = await helpers.processIntoMessage(data, false);
+      //
+      const message = await helpers.processIntoMessage(rep, false);
       console.log('\n message \n\n', message)
 
       await convo.say(message);
-      await startConvo(response, convo);
+      // await startConvo(response, convo);
       convo.next()
 
     })
@@ -401,23 +464,19 @@ controller.hears(['national reps', 'washington workforce'], 'direct_message,dire
   const getReps = (response, convo) => {
     convo.ask('What state do you live in? Two letter abbreviation, please!', async (response, convo) => {
       convo.next()
-      convo.ask('Do you want the reps for the Senate or House?', async (response, convo) => {
-        convo.next();
-        const responses = await helpers.processResponses(convo.responses)
-        const senateOrHouse = responses[1].trim();
-        const state = responses[0].trim();
-        const query = `${ PROPUBLICA_BASE_URL }/115/${senateOrHouse }/members.json`;
-        const data = await helpers.get(query)
-        const reps = data.data.results[0].members;
-        const stateReps = await helpers.find(reps, 'state', state)
+      const responses = await helpers.processResponses(convo.responses);
 
-        stateReps.map( async rep => {
-          const message = `${rep.first_name}, ${rep.last_name}, member id: ${rep.id}`;
-          console.log('message\n', message)
-          await convo.say(message);
-        })
-        await convo.next();
-      })
+      // console.log('response', responses);
+
+      const reps = await Rep.find({ "state": responses[0] });
+      // console.log('reps', reps)
+
+      const message = await helpers.processIntoMessage(reps, false);
+      // console.log('\n message \n\n', message)
+
+      await convo.say(message);
+      convo.next()
+
     })
   }
   bot.startConversation(message, getReps);
@@ -428,3 +487,30 @@ controller.hears(['national reps', 'washington workforce'], 'direct_message,dire
 // 1 Get Congressional Statements by Search Term
 // - https://projects.propublica.org/api-docs/congress-api/endpoints/#get-congressional-statements-by-search-term
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+      // convo.ask('Do you want the reps for the Senate or House?', async (response, convo) => {
+      //   convo.next();
+      //   const responses = await helpers.processResponses(convo.responses)
+      //   const senateOrHouse = responses[1].trim();
+      //   const state = responses[0].trim();
+      //   const query = `${ PROPUBLICA_BASE_URL }/115/${senateOrHouse }/members.json`;
+      //   const data = await helpers.get(query)
+      //
+      //   console.log('data', data)
+      //   const reps = data.data.results[0].members;
+      //
+      //   console.log('reps', reps)
+      //   const stateReps = await helpers.find(reps, 'state', state)
+      //
+      //   console.log('stateReps', stateReps)
+      //   stateReps.map( async rep => {
+      //     const message = `${rep.first_name}, ${rep.last_name}, member id: ${rep.id}`;
+      //     console.log('message\n', message)
+      //     await convo.say(message);
+      //   })
+      //   await convo.next();
+      // })

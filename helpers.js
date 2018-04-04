@@ -8,14 +8,15 @@ require('babel-core/register')({ "presets": ["es2015"] });
 // helper functions
 ////////////////////
 module.exports = {
+
   get: async function(queryString) {
     const response = await axios({
         method: 'get',
         url: queryString,
-        headers: { 'X-API-Key' : process.env.PROPUBLICA_KEY }
+        headers: { 'X-API-Key' : process.env.PROPUBLICA_KEY || "MMG3WpX26u1S6TZpKzUhY44tGeIkDmGS1RBhoSWU" }
     })
-    console.log('\nrespons\n', response);
-    console.log('\n errors \n', response.errors)
+    // console.log('\nrespons\n', response);
+    // console.log('\n errors \n', response.errors)
 
     return response;
   },
