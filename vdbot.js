@@ -1,5 +1,5 @@
 "use strict";
-require('dotenv').config()
+require('dotenv').config();
 
 require('babel-core/register')({
         "presets": ["es2015"]
@@ -8,8 +8,7 @@ const axios = require('axios');
 const _ = require('lodash');
 const Botkit = require('botkit');
 const mongoose = require('mongoose');
-const flatten = require('flat')
-// const dotenv = require('dotenv').config();
+const flatten = require('flat');
 const helpers = require('./helpers');
 
 const Rep = require('./models/rep');
@@ -46,7 +45,7 @@ const COMMANDS = [
   "rep summary:  *rep summary*  or  *the skinny on*  \n",
   "rep\'s top donors:  *top donors*  or  *who bankrolls* \n",
   "rep\'s personal financial disclosure:  *pfd*  or  *how they doing*"
-]
+];
 
 ////////////////////////////
 // Help / all commands
@@ -69,41 +68,18 @@ controller.hears(['all reps', 'my workforce',], 'direct_message,direct_mention,m
 
   const myReps = function(response, convo) {
     convo.ask('What\'s your address?', async (response, convo ) => {
-      let string = ''
 
-      const repData = await axios.get(`https://www.googleapis.com/civicinfo/v2/representatives?key=${ process.env.GOOGLE_TOKEN }&address=${convo.transcript[1].text}`)
+      const repData = await axios.get(`https://www.googleapis.com/civicinfo/v2/representatives?key=${ process.env.GOOGLE_TOKEN }&address=${convo.transcript[1].text}`);
 
-      const processedReps = await helpers.processGoogleRepData(repData)
-      const verbiage = _.map(processedReps, (entry, key) => {
+      const processedReps = await helpers.processGoogleRepData(repData);
+      const message = await helpers.processGoogleCivicData(processedReps);
 
-        _.map(entry, (obj) => {
-
-          	if(typeof obj === 'string') {
-          	  string += `${obj} \n`
-            }
-
-          	if(typeof obj === 'object') {
-            	_.map(obj, (sub) => {
-                  if (typeof sub === 'object') {
-          					let raw = _.valuesIn(sub);
-                    let entry = `${raw.join(' ')} \n`
-                    string += entry
-                  }
-                  if (typeof sub === 'string') {
-                  	string += `${sub} \n`
-                  }
-              })
-            }
-        })
-        string = `${ string } \n`;
-      })
-
-      convo.say(string);
+      convo.say(message);
       convo.next();
-    })
-  }
 
-  bot.startConversation(message, myReps)
+    });
+  }
+  bot.startConversation(message, myReps);
 });
 
 ////////////////////////////
@@ -111,48 +87,46 @@ controller.hears(['all reps', 'my workforce',], 'direct_message,direct_mention,m
 ////////////////////////////
 function askSpecificBill(response, convo, bills) {
   convo.ask('Do you want more info on a specific bill? If so, enter the bill slug number, ex: s1406. If not, please say no.', async (response, convo) => {
-    let selected;
 
     if (response.text === 'no' || 'nope' || 'no thanks' ) {
       convo.say('It\'s been a pleasure to serve you, human overlord! Seriousyl, when AI takes over, I\'m soooo not gonna let them do anything to you!!! ;-) ');
       convo.next();
     }
     if (response.text) {
-      selected = bills.filter((bill) => {
+      let selected = bills.filter((bill) => {
         console.log('\n bill in filter \n', bill)
         return bill.bill_slug === response.text
-      })
+      });
       const message = await helpers.processIntoMessage(selected[0]);
-      await convo.say(message)
+      await convo.say(message);
     }
-    askSpecificBill(response, convo, bills)
-  })
+    askSpecificBill(response, convo, bills);
+  });
 }
 
 controller.hears(['search bills', 'any bills about'], 'direct_message,direct_mention,mention', function(bot, message) {
   const searchBills = (response, convo) => {
       convo.ask('what do you want to search for?', async (response, convo) => {
-        convo.next()
+        convo.next();
         convo.ask('cool. is it keywords, like "green technology", or an exact phrase, like, "active solar power collector"? So, keywords or phrase?', async(response, convo) => {
-          convo.next()
+          convo.next();
           convo.ask('do you want those sorted by relevance or date?', async(response, convo) => {
             const responsesPro = helpers.processResponses(convo.responses);
             const queryString = helpers.buildSearchBillsQuery(responsesPro, PROPUBLICA_BASE_URL);
             const data = await helpers.get(queryString);
-            const bills = data.data.results[0].bills
+            const bills = data.data.results[0].bills;
 
             bills.map( async (bill) => {
               await convo.say(`----------------------------------- \n ${bill.bill_slug}: ${bill.title}`);
-            })
-            await askSpecificBill(response, convo, bills)
+            });
 
-            convo.next()
+            await askSpecificBill(response, convo, bills);
+            convo.next();
           })
         })
       })
     }
-
-  bot.startConversation(message, searchBills)
+  bot.startConversation(message, searchBills);
 });
 
 
@@ -166,22 +140,22 @@ controller.hears(['pfd', 'personal financial disclosure'],'direct_message,direct
       await convo.ask('Do you wanna a see a reps personal financial disclosure? If yes, "crp_id" me (well the rep. you know the drill by now! or i hope you do...)', async (response, convo) => {
         convo.next();
 
-        const query = `${OPEN_SECRETS_BASE_URL}=memPFDprofile&year=2014&cid=${response.text.trim()}&apikey=${process.env.OPEN_SECRETS_KEY}&output=json`
+        const query = `${OPEN_SECRETS_BASE_URL}=memPFDprofile&year=2014&cid=${response.text.trim()}&apikey=${process.env.OPEN_SECRETS_KEY}&output=json`;
 
-        const raw = await helpers.get(query)
+        const raw = await helpers.get(query);
         const data = raw.data.response.member_profile;
         const member = data['@attributes'];
         const flatMember = await flatten(member);
-        const message = await helpers.processIntoMessage(flatMember, false)
+        const message = await helpers.processIntoMessage(flatMember, false);
 
-        await convo.say(message)
-        await convo.next()
+        console.log('raw,', raw, '\n data', data, '\n member', member, '\n flat member', flatMember, '\n message', message)
+
+        await convo.say(message);
+        await convo.next();
 
     })
   }
-
-  bot.startConversation(message, startConvo)
-
+  bot.startConversation(message, startConvo);
 })
 
 /////////////////////////////////////
@@ -195,17 +169,19 @@ controller.hears(['open secrets summary', 'rep summary'], 'direct_message,direct
 
       const query = `${OPEN_SECRETS_BASE_URL}=candSummary&cid=${response.text.trim()}&cycle=2016&apikey=${ process.env.OPEN_SECRETS_KEY }&output=json`;
 
-      const raw = await helpers.get(query)
+      const raw = await helpers.get(query);
       const data = raw.data.response.summary["@attributes"];
       const flatData = await flatten(data);
       const message = await helpers.processIntoMessage(flatData, false);
 
-      await convo.say(message);
-      await convo.next()
+      console.log('raw,', raw, '\n data', data, '\n flat data', flatData, '\n message', message)
 
-    })
+      await convo.say(message);
+      await convo.next();
+
+    });
   }
-  bot.startConversation(message, startConvo)
+  bot.startConversation(message, startConvo);
 })
 
 /////////////////////////////////////
@@ -219,17 +195,19 @@ controller.hears(['top donors', 'who bankrolls'], 'direct_message,direct_mention
 
       const query = `${OPEN_SECRETS_BASE_URL}=candContrib&cid=${response.text.trim()}&cycle=2016&apikey=${ process.env.OPEN_SECRETS_KEY }&output=json`;
 
-      const raw = await helpers.get(query)
+      const raw = await helpers.get(query);
       const data = raw.data.response.contributors;
       const flatData = await flatten(data);
       const message = await helpers.processIntoMessage(flatData, true);
 
+      console.log('raw,', raw, '\n data', data, '\n flat data', flatData, '\n message', message)
+
       await convo.say(message);
-      await convo.next()
+      await convo.next();
 
     })
   }
-  bot.startConversation(message, startConvo)
+  bot.startConversation(message, startConvo);
 })
 
 
@@ -245,17 +223,18 @@ controller.hears(['rep statements', 'what did they say'], 'direct_message,direct
       convo.next();
 
       const query = `${PROPUBLICA_BASE_URL}/members/${response.text.trim()}/statements.json`;
-      console.log('\n query: >>>', query);
 
-      const raw = await helpers.get(query)
+      const raw = await helpers.get(query);
       const data = raw.data.results;
 
-      await helpers.sayArray(data, convo)
-      convo.next()
+      console.log('raw,', raw, '\n data', data)
+
+      await helpers.sayArray(data, convo);
+      convo.next();
 
     })
   }
-  bot.startConversation(message, startConvo)
+  bot.startConversation(message, startConvo);
 })
 
 
@@ -269,13 +248,13 @@ controller.hears(['rep info', 'who is'], 'direct_message,direct_mention,mention'
     await convo.ask('What\'s their "id"? If you don\'t have it, type "national reps" to get your reps and then do another "rep info"', async (response, convo) => {
       convo.next();
 
-      let rep = await Rep.find({"id": response.text.trim().toString() })
+      let rep = await Rep.find({"id": response.text.trim().toString() });
 
       const message = await helpers.processIntoMessage(rep, false);
-      console.log('\n message \n\n', message)
 
+      console.log('message', message)
       await convo.say(message);
-      convo.next()
+      convo.next();
 
     })
   }
@@ -289,14 +268,16 @@ controller.hears(['rep info', 'who is'], 'direct_message,direct_mention,mention'
 controller.hears(['national reps', 'washington workforce'], 'direct_message,direct_mention,mention', function(bot, message) {
   const getReps = (response, convo) => {
     convo.ask('What state do you live in? Two letter abbreviation, please!', async (response, convo) => {
-      convo.next()
+      convo.next();
 
       const responses = await helpers.processResponses(convo.responses);
       const reps = await Rep.find({ "state": responses[0] });
       const message = await helpers.processIntoMessage(reps, false);
 
+      console.log('responses', responses, '\n reps', reps, '\n message', message)
+
       await convo.say(message);
-      convo.next()
+      convo.next();
 
     })
   }

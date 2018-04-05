@@ -38,6 +38,44 @@ module.exports = {
     })
     return string;
   },
+  processGoogleRepData: function(data) {
+    let cleanedData = {};
+
+    _.map(data.data.offices, (entry) => {
+       	let totalOffs = entry.officialIndices.length;
+        for (let i = 0; i < totalOffs; i++) {
+       	 	return cleanedData[entry.name] = data.data.officials[entry.officialIndices[totalOffs - 1]];
+      	}
+      });
+    return cleanedData;
+  },
+  processGoogleCivicData: function(data) {
+    let string = ''
+    _.map(data, (entry, key) => {
+
+      _.map(entry, (obj) => {
+
+          if(typeof obj === 'string') {
+            string += `${obj} \n`
+          }
+
+          if(typeof obj === 'object') {
+            _.map(obj, (sub) => {
+                if (typeof sub === 'object') {
+                  let raw = _.valuesIn(sub);
+                  let entry = `${raw.join(' ')} \n`
+                  string += entry
+                }
+                if (typeof sub === 'string') {
+                  string += `${sub} \n`
+                }
+            })
+          }
+      })
+      string = `${ string } \n`;
+    })
+    return string;
+  },
   find: function (array, property, text) {
     const found = array.filter((item) => {
       return item[property].toLowerCase() === text.toLowerCase();
@@ -81,16 +119,5 @@ module.exports = {
     }
     console.log('\nurl\n', url);
     return url;
-  },
-  processGoogleRepData: function(data) {
-    let cleanedData = {};
-
-    _.map(data.data.offices, (entry) => {
-       	let totalOffs = entry.officialIndices.length;
-        for (let i = 0; i < totalOffs; i++) {
-       	 	return cleanedData[entry.name] = data.data.officials[entry.officialIndices[totalOffs - 1]];
-      	}
-      });
-    return cleanedData;
   }
 }
