@@ -261,8 +261,8 @@ controller.hears(['rep info', 'who is'], 'direct_message,direct_mention,mention'
 })
 
 ////////////////////////////////////////////////////////////
-// propublica get reps detail
-// - refactor search locally and not hit propublica
+// get reps
+// REFACTOR object you send to slack
 ////////////////////////////////////////////////////////////
 controller.hears(['national reps', 'washington workforce'], 'direct_message,direct_mention,mention', function(bot, message) {
 
@@ -270,11 +270,10 @@ controller.hears(['national reps', 'washington workforce'], 'direct_message,dire
     convo.ask('What state do you live in? Two letter abbreviation, please!', async (response, convo) => {
       convo.next();
 
-      const responses = await helpers.processResponses(convo.responses);
-      const reps = await Rep.find({ "state": responses[0] });
+      const reps = await Rep.find({ "state": response.text.trim() });
       const message = await helpers.processIntoMessage(reps, false);
 
-      console.log('responses', responses, '\n reps', reps, '\n message', message)
+      console.log('responses', response.text.trim(), '\n reps', reps, '\n message', message)
 
       convo.say(message);
       convo.next();
@@ -286,6 +285,9 @@ controller.hears(['national reps', 'washington workforce'], 'direct_message,dire
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //        TO DO
-// 1 Get Congressional Statements by Search Term
-// - https://projects.propublica.org/api-docs/congress-api/endpoints/#get-congressional-statements-by-search-term
+// - Get Congressional Statements by Search Term
+//      - https://projects.propublica.org/api-docs/congress-api/endpoints/#get-congressional-statements-by-search-term
+// - Refactor GET REPS
+//      - the object you send to slack has both _id and id. pretty confusing
+//      - and would some sort of divider kill ya?!?!?!?
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
